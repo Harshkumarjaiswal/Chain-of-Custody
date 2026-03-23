@@ -1,0 +1,203 @@
+# Digital Evidence Management & Chain of Custody System
+
+A web-based platform for cyber forensic investigators to securely manage digital evidence, maintain chain of custody, collaborate on findings, and generate court-ready forensic reports.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **MongoDB**: The plan assumes you have MongoDB installed locally or have a MongoDB Atlas connection string ready. Please confirm which you prefer.
+
+> [!IMPORTANT]
+> **AI Summarization**: The synopsis mentions Python + Transformers for AI summarization. For this initial build, I'll implement a **mock AI summarization endpoint** within the Node.js backend (using simple extractive summarization) to avoid the complexity of a separate Python microservice. We can add a real Python/Transformers service as a future enhancement. **Do you want the real Python service now, or is the mock approach acceptable?**
+
+> [!WARNING]
+> **File Storage**: Evidence files (disk images, logs, etc.) will be stored on the **local filesystem** under `d:\CAPSTRONE\server\uploads\`. For production, you'd want cloud storage (S3, Azure Blob). Is local storage acceptable for now?
+
+---
+
+## Proposed Changes
+
+### 1. Project Structure
+
+```
+d:\CAPSTRONE\
+├── server/                     # Backend (Node.js + Express)
+│   ├── config/
+│   │   └── db.js               # MongoDB connection
+│   ├── middleware/
+│   │   ├── auth.js             # JWT authentication
+│   │   └── roleCheck.js        # RBAC middleware
+│   ├── models/
+│   │   ├── User.js
+│   │   ├── Case.js
+│   │   ├── Evidence.js
+│   │   ├── CustodyLog.js
+│   │   ├── Task.js
+│   │   └── Finding.js
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── cases.js
+│   │   ├── evidence.js
+│   │   ├── custody.js
+│   │   ├── tasks.js
+│   │   ├── findings.js
+│   │   ├── ai.js
+│   │   └── reports.js
+│   ├── controllers/            # Route handlers
+│   ├── utils/
+│   │   ├── hashUtils.js        # Crypto hashing
+│   │   └── pdfGenerator.js     # PDFKit report generation
+│   ├── uploads/                # Evidence file storage
+│   ├── server.js               # Entry point
+│   ├── package.json
+│   └── .env
+├── client/                     # Frontend (React + Vite)
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   ├── context/
+│   │   ├── services/
+│   │   ├── App.jsx
+│   │   ├── App.css
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── index.html
+│   ├── package.json
+│   └── vite.config.js
+└── SYNOPSISCAP.docx
+```
+
+---
+
+### 2. Backend — Node.js + Express + MongoDB
+
+#### [NEW] [package.json](file:///d:/CAPSTRONE/server/package.json)
+Dependencies: `express`, `mongoose`, `bcryptjs`, `jsonwebtoken`, `multer`, `cors`, `dotenv`, `pdfkit`, `morgan`
+
+#### [NEW] [db.js](file:///d:/CAPSTRONE/server/config/db.js)
+MongoDB connection using Mongoose with connection string from `.env`
+
+#### [NEW] [server.js](file:///d:/CAPSTRONE/server/server.js)
+Express app setup with CORS, JSON parsing, route mounting, and server start
+
+#### Database Models
+
+| Model | Key Fields |
+|-------|-----------|
+| **User** | `name`, `email`, `password` (hashed), `role` (admin/officer/analyst/supervisor) |
+| **Case** | `caseId` (unique), `title`, `description`, `status` (open/in-progress/closed), `createdBy`, `assignedInvestigators[]` |
+| **Evidence** | `caseId` (ref), `fileName`, `filePath`, `fileSize`, `hashValue` (SHA-256), `uploadedBy`, `description`, `category` |
+| **CustodyLog** | `evidenceId` (ref), `action`, `performedBy`, `timestamp`, `details` |
+| **Task** | `evidenceId` (ref), `assignedBy`, `assignedTo`, `status` (pending/accepted/rejected/completed), `rejectionReason` |
+| **Finding** | `evidenceId` (ref), `content` (text notes), `addedBy`, `timestamp` |
+
+#### API Endpoints
+
+| Method | Route | Description | Auth |
+|--------|-------|-------------|------|
+| POST | `/api/auth/register` | Register user | Public |
+| POST | `/api/auth/login` | Login, returns JWT | Public |
+| GET | `/api/auth/me` | Get current user | ✅ |
+| GET/POST | `/api/cases` | List / Create cases | ✅ Officer+ |
+| GET/PUT/DELETE | `/api/cases/:id` | Case CRUD | ✅ |
+| GET/POST | `/api/evidence/:caseId` | List / Upload evidence | ✅ |
+| GET | `/api/evidence/detail/:id` | Evidence detail | ✅ |
+| POST | `/api/evidence/:id/verify` | Re-hash and verify integrity | ✅ |
+| GET | `/api/custody/:evidenceId` | Get custody log | ✅ |
+| GET/POST | `/api/tasks` | List / Create task assignments | ✅ Supervisor |
+| PUT | `/api/tasks/:id/respond` | Accept/reject task | ✅ Analyst |
+| GET/POST | `/api/findings/:evidenceId` | Get / Add findings | ✅ |
+| POST | `/api/ai/summarize/:evidenceId` | Summarize findings (mock AI) | ✅ |
+| GET | `/api/reports/:caseId` | Generate PDF report | ✅ |
+
+#### [NEW] [hashUtils.js](file:///d:/CAPSTRONE/server/utils/hashUtils.js)
+- `generateHash(filePath)` — SHA-256 hash of uploaded file using Node.js `crypto`
+- Used on upload and for re-verification
+
+#### [NEW] [pdfGenerator.js](file:///d:/CAPSTRONE/server/utils/pdfGenerator.js)
+- Uses PDFKit to generate a structured forensic report containing:
+  - Case details, evidence list, hash verification, custody log, findings, AI summary
+
+---
+
+### 3. Frontend — React + Vite
+
+#### Pages & Components
+
+| Page | Route | Description |
+|------|-------|-------------|
+| **Login** | `/login` | Authentication form |
+| **Register** | `/register` | Registration with role selection |
+| **Dashboard** | `/` | Overview stats, recent cases, activity feed |
+| **Cases List** | `/cases` | Filterable/searchable case list |
+| **Case Detail** | `/cases/:id` | Case info, linked evidence, assigned team |
+| **New Case** | `/cases/new` | Create case form |
+| **Evidence Detail** | `/evidence/:id` | Evidence info, hash status, discussion thread, findings |
+| **Task Management** | `/tasks` | View/manage task assignments |
+| **Report View** | `/reports/:caseId` | Preview and download PDF report |
+| **Admin Panel** | `/admin` | User management (admin only) |
+
+#### Design System
+- **Color Palette**: Dark forensic theme with deep navy (`#0a0f1a`), accent cyan (`#00d4ff`), alert red, success green
+- **Typography**: Inter font family from Google Fonts
+- **Glassmorphism** cards with subtle blur and transparency
+- **Smooth micro-animations** on hover, page transitions, loading states
+- **Responsive** layout with sidebar navigation
+
+#### Key Components
+- `Sidebar` — Collapsible navigation with role-based menu items
+- `Navbar` — Top bar with user info, notifications
+- `CaseCard` — Glassmorphic case summary card
+- `EvidenceCard` — Evidence item with hash status indicator
+- `CustodyTimeline` — Visual timeline of custody events
+- `FindingsThread` — Discussion-style thread for evidence findings
+- `TaskContract` — Accept/reject UI for task assignments
+- `HashBadge` — Visual indicator of evidence integrity status
+- `StatCard` — Dashboard statistics with animated counters
+
+---
+
+### 4. AI Summarization (Mock)
+
+The mock AI summarizer will:
+1. Collect all findings for an evidence item
+2. Extract key sentences (first sentence of each finding)
+3. Return a structured summary
+
+This avoids the need for Python/Transformers in the initial build while keeping the API contract intact for future upgrade.
+
+---
+
+### 5. Report Generation (PDFKit)
+
+The PDF report will include:
+1. **Header** — Agency logo placeholder, report title, case ID
+2. **Case Summary** — Description, dates, status
+3. **Evidence Inventory** — Table of all evidence with hash values
+4. **Chain of Custody** — Chronological custody log entries
+5. **Investigation Findings** — All findings with analyst attributions
+6. **AI Summary** — Generated summary of findings
+7. **Conclusion** — Auto-generated or investigator-provided
+8. **Integrity Statement** — Hash verification results
+
+---
+
+## Verification Plan
+
+### Automated Tests (Browser-based)
+Since this is a full-stack web app, verification will be done through browser testing:
+
+1. **Auth Flow**: Navigate to register page → create user → login → verify dashboard loads
+2. **Case CRUD**: Create a case → verify it appears in list → view details → update status
+3. **Evidence Upload**: Upload a test file → verify hash generated → verify custody log entry created
+4. **Hash Verification**: Re-verify an uploaded evidence file → confirm hash matches
+5. **Task Assignment**: As supervisor, assign task → as analyst, accept/reject task
+6. **Findings & Discussion**: Add findings to evidence → verify thread updates
+7. **AI Summarization**: Click summarize button → verify summary appears
+8. **Report Generation**: Generate PDF → verify download works
+9. **RBAC**: Verify analysts cannot create cases, officers cannot manage users
+
+### Manual Verification
+- Visual inspection of UI design (dark theme, glassmorphism, animations)
+- PDF report content review for court-readiness
+- Responsive design check at different viewport sizes
