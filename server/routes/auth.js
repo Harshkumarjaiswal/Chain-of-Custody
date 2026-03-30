@@ -78,7 +78,7 @@ const transporter = nodemailer.createTransport({
 // Register - Step 1: Send OTP to email before creating account
 router.post('/register/send-otp', async (req, res) => {
     try {
-        const { name, email, password, role, department } = req.body;
+        const { name, email, password } = req.body;
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
@@ -89,7 +89,7 @@ router.post('/register/send-otp', async (req, res) => {
         const otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
 
         // Store pending registration in memory temporarily
-        pendingRegistrations[email] = { name, email, password, role, department, otp, otpExpire };
+        pendingRegistrations[email] = { name, email, password, otp, otpExpire };
 
         console.log(`\n📧 Register OTP for ${email}: ${otp}\n`);
 
@@ -124,10 +124,10 @@ router.post('/register/verify-otp', async (req, res) => {
         }
         if (pending.otp !== otp) return res.status(400).json({ message: 'Invalid OTP' });
 
-        const { name, password, role, department } = pending;
+        const { name, password } = pending;
         delete pendingRegistrations[email];
 
-        const user = await User.create({ name, email, password, role, department });
+        const user = await User.create({ name, email, password });
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRE
@@ -145,14 +145,14 @@ router.post('/register/verify-otp', async (req, res) => {
 // Register (legacy - kept for compatibility)
 router.post('/register', async (req, res) => {
     try {
-        const { name, email, password, role, department } = req.body;
+        const { name, email, password } = req.body;
 
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists with this email' });
         }
 
-        const user = await User.create({ name, email, password, role, department });
+        const user = await User.create({ name, email, password });
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRE
