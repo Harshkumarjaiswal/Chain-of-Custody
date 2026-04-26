@@ -5,7 +5,7 @@ import { registerSendOtp, registerVerifyOtp } from '../services/api';
 
 const Register = () => {
     const [form, setForm] = useState({
-        name: '', email: '', password: '', role: 'officer', department: ''
+        name: '', email: '', password: ''
     });
     const [otp, setOtp] = useState('');
     const [step, setStep] = useState(1); // 1 = form, 2 = otp verify
@@ -88,29 +88,6 @@ const Register = () => {
                                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                                 required
                                 minLength={6}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Role</label>
-                            <select
-                                className="form-select"
-                                value={form.role}
-                                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                            >
-                                <option value="officer">Officer</option>
-                                <option value="analyst">Analyst</option>
-                                <option value="supervisor">Supervisor</option>
-                                <option value="admin">Administrator</option>
-                            </select>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Department (optional)</label>
-                            <input
-                                type="text"
-                                className="form-input"
-                                placeholder="e.g., Cyber Crime Division"
-                                value={form.department}
-                                onChange={(e) => setForm({ ...form, department: e.target.value })}
                             />
                         </div>
                         <button type="submit" className="btn btn-primary btn-block btn-lg" disabled={loading}>

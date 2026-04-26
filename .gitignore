@@ -1,2 +1,6 @@
-server/uploads/ 
-SYNOPSISCAP.docx 
+server/uploads/
+SYNOPSISCAP.docx
+.env
+.env.local
+node_modules/
+*.log
