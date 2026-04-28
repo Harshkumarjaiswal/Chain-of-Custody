@@ -16,6 +16,7 @@ const CaseDetail = () => {
         file: null, category: 'other', description: '', acquisitionTool: 'Other'
     });
     const [uploading, setUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const [generatingReport, setGeneratingReport] = useState(false);
 
     useEffect(() => {
@@ -41,15 +42,17 @@ const CaseDetail = () => {
         e.preventDefault();
         if (!uploadForm.file) return;
         setUploading(true);
+        setUploadProgress(0);
         try {
             const formData = new FormData();
             formData.append('evidenceFile', uploadForm.file);
             formData.append('category', uploadForm.category);
             formData.append('description', uploadForm.description);
             formData.append('acquisitionTool', uploadForm.acquisitionTool);
-            await uploadEvidence(id, formData);
+            await uploadEvidence(id, formData, (percent) => setUploadProgress(percent));
             setShowUpload(false);
             setUploadForm({ file: null, category: 'other', description: '', acquisitionTool: 'Other' });
+            setUploadProgress(0);
             fetchData();
         } catch (err) {
             alert(err.response?.data?.message || 'Upload failed');
@@ -252,9 +255,20 @@ const CaseDetail = () => {
                             <div className="modal-actions">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowUpload(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" disabled={uploading}>
-                                    {uploading ? 'Uploading...' : 'Upload Evidence'}
+                                    {uploading ? `Uploading... ${uploadProgress}%` : 'Upload Evidence'}
                                 </button>
                             </div>
+                            {uploading && (
+                                <div style={{ marginTop: 12 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                                        <span>Uploading large file — please wait...</span>
+                                        <span>{uploadProgress}%</span>
+                                    </div>
+                                    <div style={{ background: 'var(--border-color)', borderRadius: 4, height: 6, overflow: 'hidden' }}>
+                                        <div style={{ width: `${uploadProgress}%`, background: 'var(--primary)', height: '100%', borderRadius: 4, transition: 'width 0.3s ease' }} />
+                                    </div>
+                                </div>
+                            )}
                         </form>
                     </div>
                 </div>

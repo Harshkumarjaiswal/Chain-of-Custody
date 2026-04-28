@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getEvidenceDetail, verifyEvidence, getCustodyLog, getFindings, addFinding, summarizeFindings } from '../services/api';
+import { getEvidenceDetail, verifyEvidence, getCustodyLog, getFindings, addFinding, summarizeFindings, downloadEvidence } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { HiArrowLeft, HiOutlineShieldCheck, HiOutlineLightningBolt, HiPlus } from 'react-icons/hi';
+import { HiArrowLeft, HiOutlineShieldCheck, HiOutlineLightningBolt, HiPlus, HiOutlineDownload } from 'react-icons/hi';
 
 const EvidenceDetail = () => {
     const { id } = useParams();
@@ -15,6 +15,7 @@ const EvidenceDetail = () => {
     const [verifying, setVerifying] = useState(false);
     const [verifyResult, setVerifyResult] = useState(null);
     const [summarizing, setSummarizing] = useState(false);
+    const [showAllLogs, setShowAllLogs] = useState(false);
     const [newFinding, setNewFinding] = useState({ content: '', type: 'observation' });
     const [showFindingForm, setShowFindingForm] = useState(false);
 
@@ -78,6 +79,33 @@ const EvidenceDetail = () => {
         }
     };
 
+    const handleDownload = async () => {
+        try {
+            const res = await downloadEvidence(id);
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', evidence.originalName);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            // Parse error from blob response
+            if (err.response?.data instanceof Blob) {
+                const text = await err.response.data.text();
+                try {
+                    const json = JSON.parse(text);
+                    alert('Download failed: ' + json.message);
+                } catch {
+                    alert('Download failed: ' + text);
+                }
+            } else {
+                alert('Download failed: ' + (err.response?.data?.message || err.message));
+            }
+        }
+    };
+
     if (loading) return <div className="loader"><div className="spinner"></div></div>;
     if (!evidence) return <div className="empty-state"><h3>Evidence not found</h3></div>;
 
@@ -94,14 +122,15 @@ const EvidenceDetail = () => {
                     </div>
                 </div>
                 <div className="flex gap-2">
+                    <button className="btn btn-secondary" onClick={handleDownload}>
+                        <HiOutlineDownload /> Download Evidence
+                    </button>
                     <button className="btn btn-secondary" onClick={handleVerify} disabled={verifying}>
                         <HiOutlineShieldCheck /> {verifying ? 'Verifying...' : 'Verify Integrity'}
                     </button>
-                    {findings.length > 0 && (
-                        <button className="btn btn-primary" onClick={handleSummarize} disabled={summarizing}>
-                            <HiOutlineLightningBolt /> {summarizing ? 'Summarizing...' : 'AI Summarize'}
-                        </button>
-                    )}
+                    <button className="btn btn-primary" onClick={handleSummarize} disabled={summarizing}>
+                        <HiOutlineLightningBolt /> {summarizing ? 'Summarizing...' : (evidence.aiSummary ? 'Regenerate Summary' : 'AI Summarize')}
+                    </button>
                 </div>
             </div>
 
@@ -239,19 +268,29 @@ const EvidenceDetail = () => {
                         {custodyLogs.length === 0 ? (
                             <div className="empty-state"><p>No custody logs</p></div>
                         ) : (
-                            <div className="timeline">
-                                {custodyLogs.map(log => (
-                                    <div key={log._id} className="timeline-item">
-                                        <div className="timeline-time">{new Date(log.createdAt).toLocaleString()}</div>
-                                        <div className="timeline-content">
-                                            <span className="timeline-user">{log.performedBy?.name}</span>
-                                            <br />
-                                            <span className="badge badge-cyan" style={{ marginTop: 4, display: 'inline-block' }}>{log.action}</span>
-                                            {log.details && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{log.details}</div>}
+                            <>
+                                <div className="timeline">
+                                    {(showAllLogs ? custodyLogs : custodyLogs.slice(0, 3)).map(log => (
+                                        <div key={log._id} className="timeline-item">
+                                            <div className="timeline-time">{new Date(log.createdAt).toLocaleString()}</div>
+                                            <div className="timeline-content">
+                                                <span className="timeline-user">{log.performedBy?.name}</span>
+                                                <br />
+                                                <span className="badge badge-cyan" style={{ marginTop: 4, display: 'inline-block' }}>{log.action}</span>
+                                                {log.details && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{log.details}</div>}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                                {custodyLogs.length > 3 && (
+                                    <button
+                                        onClick={() => setShowAllLogs(prev => !prev)}
+                                        style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--primary)', fontSize: 13, fontWeight: 600, padding: '4px 0' }}
+                                    >
+                                        {showAllLogs ? 'Show Less ▲' : `Show More (${custodyLogs.length - 3} more) ▼`}
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
