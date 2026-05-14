@@ -309,6 +309,62 @@ router.put('/change-password', auth, async (req, res) => {
     }
 });
 
+// Forgot password - Step 1: Send OTP to email
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: 'No account found with this email' });
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        user.otpCode = otp;
+        user.otpExpire = Date.now() + 10 * 60 * 1000;
+        await user.save();
+
+        console.log(`\n🔑 Password Reset OTP for ${email}: ${otp}\n`);
+
+        try {
+            await transporter.sendMail({
+                from: `"Digital Chain of Custody" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: '🔐 Password Reset OTP - Digital Chain of Custody',
+                html: otpEmailTemplate(otp, 'reset')
+            });
+        } catch (mailError) {
+            console.error('Email send failed:', mailError);
+        }
+
+        res.json({ message: 'OTP sent to your email', userId: user._id });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Forgot password - Step 2: Verify OTP and reset password
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { userId, otp, newPassword } = req.body;
+        const user = await User.findById(userId).select('+otpCode +otpExpire');
+
+        if (!user) return res.status(404).json({ message: 'User not found' });
+        if (!user.otpCode || user.otpCode !== otp || user.otpExpire < Date.now()) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters' });
+        }
+
+        user.otpCode = undefined;
+        user.otpExpire = undefined;
+        user.password = newPassword;
+        await user.save();
+
+        res.json({ message: 'Password reset successfully. You can now log in.' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // Get all users (admin only)
 router.get('/users', auth, roleCheck('admin'), async (req, res) => {
     try {
