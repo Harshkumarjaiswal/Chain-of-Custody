@@ -27,8 +27,8 @@ if (!fs.existsSync(uploadsDir)) {
 
 // Middleware
 app.use(cors());
-app.use(express.json({ limit: '5000mb' }));
-app.use(express.urlencoded({ limit: '5000mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(morgan('dev'));
 
 // Static files for uploads
@@ -58,8 +58,13 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
         console.log(`Server running on port ${PORT}`);
         console.log(`API available at http://localhost:${PORT}/api`);
     });
+
+    // Increase timeouts for large file uploads (6GB+ can take several minutes)
+    server.timeout = 3600000;          // 1 hour
+    server.keepAliveTimeout = 3600000;
+    server.headersTimeout = 3600001;
 });

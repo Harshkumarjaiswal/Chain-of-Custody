@@ -124,10 +124,10 @@ router.post('/register/verify-otp', async (req, res) => {
         }
         if (pending.otp !== otp) return res.status(400).json({ message: 'Invalid OTP' });
 
-        const { name, password } = pending;
+        const { name, password, role, department } = pending;
         delete pendingRegistrations[email];
 
-        const user = await User.create({ name, email, password });
+        const user = await User.create({ name, email, password, role, department });
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
             expiresIn: process.env.JWT_EXPIRE
@@ -135,7 +135,7 @@ router.post('/register/verify-otp', async (req, res) => {
 
         res.status(201).json({
             token,
-            user: { id: user._id, name: user.name, email: user.email, role: user.role }
+            user: { _id: user._id, id: user._id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, department: user.department, level: user.level }
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -160,7 +160,7 @@ router.post('/register', async (req, res) => {
 
         res.status(201).json({
             token,
-            user: { id: user._id, name: user.name, email: user.email, role: user.role }
+            user: { _id: user._id, id: user._id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, department: user.department, level: user.level }
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -237,7 +237,7 @@ router.post('/verify-otp', async (req, res) => {
 
         res.json({
             token,
-            user: { id: user._id, name: user.name, email: user.email, role: user.role }
+            user: { _id: user._id, id: user._id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, department: user.department, level: user.level }
         });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -249,11 +249,82 @@ router.get('/me', auth, async (req, res) => {
     res.json({ user: req.user });
 });
 
+// Upload avatar
+const multer = require('multer');
+const path = require('path');
+const avatarStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, path.join(__dirname, '../uploads')),
+    filename: (req, file, cb) => cb(null, `avatar-${req.user._id}-${Date.now()}${path.extname(file.originalname)}`)
+});
+const avatarUpload = multer({
+    storage: avatarStorage,
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype.startsWith('image/')) cb(null, true);
+        else cb(new Error('Only image files allowed'));
+    }
+});
+
+router.post('/avatar', auth, avatarUpload.single('avatar'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ message: 'No image uploaded' });
+        const avatarUrl = `/uploads/${req.file.filename}`;
+        const user = await User.findByIdAndUpdate(req.user._id, { avatar: avatarUrl }, { new: true });
+        res.json({ avatar: user.avatar });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Update profile (bio, level, workHistory, name, department)
+router.put('/profile', auth, async (req, res) => {
+    try {
+        const { name, department, bio, level, workHistory } = req.body;
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            { name, department, bio, level, workHistory },
+            { new: true, runValidators: true }
+        );
+        res.json({ user });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Change password
+router.put('/change-password', auth, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        const user = await User.findById(req.user._id).select('+password');
+
+        const isMatch = await user.comparePassword(currentPassword);
+        if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
+
+        user.password = newPassword;
+        await user.save();
+
+        res.json({ message: 'Password changed successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // Get all users (admin only)
 router.get('/users', auth, roleCheck('admin'), async (req, res) => {
     try {
         const users = await User.find().select('-__v');
         res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Get single user by ID (admin only)
+router.get('/users/:id', auth, roleCheck('admin'), async (req, res) => {
+    try {
+        const u = await User.findById(req.params.id).select('-__v');
+        if (!u) return res.status(404).json({ message: 'User not found' });
+        res.json(u);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -288,3 +359,4 @@ router.put('/users/:id/toggle', auth, roleCheck('admin'), async (req, res) => {
 });
 
 module.exports = router;
+

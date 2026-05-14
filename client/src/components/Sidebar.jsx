@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     HiOutlineViewGrid, HiOutlineFolder, HiOutlineShieldCheck,
     HiOutlineClipboardList, HiOutlineUserGroup, HiOutlineLogout,
-    HiOutlineDocumentReport, HiOutlineLightningBolt
+    HiOutlineDocumentReport, HiOutlineLightningBolt, HiOutlineUser
 } from 'react-icons/hi';
 
 const Sidebar = () => {
@@ -53,13 +53,18 @@ const Sidebar = () => {
             </nav>
 
             <div className="sidebar-user">
-                <div className="sidebar-avatar">
-                    {user?.name?.charAt(0)?.toUpperCase() || '?'}
-                </div>
-                <div className="sidebar-user-info">
-                    <div className="sidebar-user-name">{user?.name}</div>
-                    <div className="sidebar-user-role">{user?.role}</div>
-                </div>
+                <NavLink to="/profile" style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, textDecoration: 'none', color: 'inherit' }}>
+                    <div className="sidebar-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+                        {user?.avatar
+                            ? <img src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:5000${user.avatar}`} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                            : user?.name?.charAt(0)?.toUpperCase() || '?'
+                        }
+                    </div>
+                    <div className="sidebar-user-info">
+                        <div className="sidebar-user-name">{user?.name}</div>
+                        <div className="sidebar-user-role">{user?.role}</div>
+                    </div>
+                </NavLink>
                 <button className="sidebar-logout" onClick={handleLogout} title="Logout">
                     <HiOutlineLogout size={18} />
                 </button>

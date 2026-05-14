@@ -29,6 +29,29 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    bio: {
+        type: String,
+        trim: true,
+        default: ''
+    },
+    level: {
+        type: String,
+        enum: ['junior', 'mid', 'senior', 'lead', 'expert'],
+        default: 'junior'
+    },
+    workHistory: [
+        {
+            title: { type: String, trim: true },
+            organization: { type: String, trim: true },
+            from: { type: String },
+            to: { type: String },
+            current: { type: Boolean, default: false }
+        }
+    ],
+    avatar: {
+        type: String,
+        default: ''
+    },
     otpCode: {
         type: String,
         select: false

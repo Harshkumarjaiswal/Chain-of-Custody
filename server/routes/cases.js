@@ -12,10 +12,17 @@ router.get('/', auth, async (req, res) => {
         if (req.query.priority) filter.priority = req.query.priority;
 
         // Analysts and officers see only their assigned cases + cases they created
+        // + cases that have tasks assigned to them
         if (['analyst', 'officer'].includes(req.user.role)) {
+            // Get case IDs from tasks assigned to this user
+            const Task = require('../models/Task');
+            const assignedTasks = await Task.find({ assignedTo: req.user._id }).select('caseId');
+            const taskCaseIds = assignedTasks.map(t => t.caseId);
+
             filter.$or = [
                 { createdBy: req.user._id },
-                { assignedInvestigators: req.user._id }
+                { assignedInvestigators: req.user._id },
+                { _id: { $in: taskCaseIds } }
             ];
         }
 

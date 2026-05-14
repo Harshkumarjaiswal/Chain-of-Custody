@@ -10,17 +10,31 @@ router.get('/', auth, async (req, res) => {
     try {
         let filter = {};
 
-        if (req.user.role === 'analyst') {
-            filter.assignedTo = req.user._id;
+        if (req.user.role === 'admin') {
+            // admin sees all tasks
         } else if (req.user.role === 'supervisor') {
-            filter.assignedBy = req.user._id;
+            // supervisor sees tasks they assigned OR tasks assigned to them
+            filter.$or = [
+                { assignedBy: req.user._id },
+                { assignedTo: req.user._id }
+            ];
+        } else {
+            // analyst, officer — only see tasks assigned to them
+            filter.assignedTo = req.user._id;
         }
 
-        if (req.query.status) filter.status = req.query.status;
+        if (req.query.status) {
+            if (filter.$or) {
+                // wrap in $and to combine with status filter
+                filter = { $and: [{ $or: filter.$or }, { status: req.query.status }] };
+            } else {
+                filter.status = req.query.status;
+            }
+        }
 
         const tasks = await Task.find(filter)
             .populate('assignedBy', 'name email role')
-            .populate('assignedTo', 'name email role')
+            .populate('assignedTo', 'name email role avatar')
             .populate('evidenceId', 'originalName category')
             .populate('caseId', 'caseId title')
             .sort({ createdAt: -1 });
@@ -112,10 +126,14 @@ router.put('/:id/status', auth, async (req, res) => {
 
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
+        // Only the assigned user can update status
+        if (task.assignedTo.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Only the assigned user can update this task' });
+        }
+
         task.status = status;
         if (status === 'completed') {
             task.completedAt = new Date();
-
             await CustodyLog.create({
                 evidenceId: task.evidenceId,
                 action: 'analysis-completed',

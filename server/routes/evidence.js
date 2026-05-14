@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 500 * 1024 * 1024 } // 500MB limit
+    limits: { fileSize: 10 * 1024 * 1024 * 1024 } // 10GB limit
 });
 
 // Get all evidence for a case
@@ -131,6 +131,44 @@ router.post('/verify/:id', auth, async (req, res) => {
             integrityStatus: evidence.integrityStatus
         });
     } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Download evidence file
+router.get('/download/:id', auth, async (req, res) => {
+    try {
+        const evidence = await Evidence.findById(req.params.id);
+        if (!evidence) return res.status(404).json({ message: 'Evidence not found' });
+
+        const fs = require('fs');
+        const path = require('path');
+
+        // Resolve absolute path from uploads directory
+        const absolutePath = path.isAbsolute(evidence.filePath)
+            ? evidence.filePath
+            : path.join(__dirname, '..', evidence.filePath);
+
+        if (!fs.existsSync(absolutePath)) {
+            return res.status(404).json({ message: `File not found on server: ${absolutePath}` });
+        }
+
+        // Log the download in custody chain
+        await CustodyLog.create({
+            evidenceId: evidence._id,
+            action: 'downloaded',
+            performedBy: req.user._id,
+            details: `Evidence file "${evidence.originalName}" downloaded for analysis`,
+            currentHash: evidence.hashValue,
+            ipAddress: req.ip
+        });
+
+        res.setHeader('Content-Disposition', `attachment; filename="${evidence.originalName}"`);
+        res.setHeader('Content-Type', evidence.mimeType || 'application/octet-stream');
+        fs.createReadStream(absolutePath).pipe(res);
+
+    } catch (error) {
+        console.error('Download error:', error);
         res.status(500).json({ message: error.message });
     }
 });

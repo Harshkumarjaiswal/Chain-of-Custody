@@ -1,0 +1,365 @@
+================================================================================
+         DIGITAL CHAIN OF CUSTODY - PROJECT OVERVIEW
+         Digital Evidence Management and Chain of Custody System
+================================================================================
+
+PROJECT NAME    : Digital Chain of Custody
+TYPE            : Full-Stack Web Application
+REPOSITORY      : https://github.com/Harshkumarjaiswal/Chain-of-Custody
+BRANCH          : main
+STACK           : Node.js + Express (Backend), React + Vite (Frontend), MongoDB
+
+
+================================================================================
+1. PROJECT PURPOSE
+================================================================================
+
+The Digital Chain of Custody system is a forensic evidence management platform
+designed for law enforcement agencies, cyber crime units, and digital forensics
+teams. It provides a secure, auditable, and structured environment to manage
+digital evidence from collection to court presentation.
+
+The system ensures:
+  - Tamper-evident evidence storage with SHA-256 hash verification
+  - Complete chain of custody logging for every action on evidence
+  - Role-based access control for different team members
+  - Secure OTP-based authentication for login and registration
+  - AI-powered investigation summarization using Groq (LLaMA 3.3 70B)
+  - PDF report generation for forensic cases
+  - Support for large evidence files up to 10GB
+
+
+================================================================================
+2. TECHNOLOGY STACK
+================================================================================
+
+BACKEND
+-------
+  Runtime         : Node.js
+  Framework       : Express.js v4
+  Database        : MongoDB (via Mongoose ODM)
+  Authentication  : JWT (JSON Web Tokens) + OTP via Nodemailer (Gmail SMTP)
+  File Uploads    : Multer (disk storage, up to 10GB)
+  Password Hashing: bcryptjs (salt rounds: 12)
+  AI Integration  : Groq SDK (LLaMA 3.3 70B model)
+  PDF Generation  : PDFKit
+  Logging         : Morgan
+
+FRONTEND
+--------
+  Framework       : React 19 + Vite 8
+  Routing         : React Router DOM v7
+  HTTP Client     : Axios (1 hour timeout for large file operations)
+  Icons           : React Icons (HeroIcons set)
+  State Management: React Context API (AuthContext)
+
+INFRASTRUCTURE
+--------------
+  Version Control : Git / GitHub
+  OTP Email       : Gmail SMTP via Nodemailer
+  AI API          : Groq Cloud (free tier, 14,400 req/day)
+  File Storage    : Local disk (server/uploads/)
+
+
+================================================================================
+3. SYSTEM ARCHITECTURE
+================================================================================
+
+  [Browser - React App :3000]
+          |
+          | HTTP (proxied via Vite)
+          |
+  [Express Server :5000]
+          |
+     _____|_____
+    |           |
+  [MongoDB]  [/uploads]
+  (Data)     (Files)
+
+
+  Authentication Flow:
+  --------------------
+  Registration:
+    User fills form --> POST /api/auth/register/send-otp
+    --> OTP emailed via Gmail --> User enters OTP
+    --> POST /api/auth/register/verify-otp --> Account created --> JWT issued
+
+  Login:
+    User enters email + password --> POST /api/auth/login
+    --> Credentials verified --> OTP emailed --> User enters OTP
+    --> POST /api/auth/verify-otp --> JWT issued --> Session started
+
+
+================================================================================
+4. DIRECTORY STRUCTURE
+================================================================================
+
+Chain-of-Custody/
+|
+|-- server/                         Backend (Node.js + Express)
+|   |-- config/
+|   |   |-- db.js                   MongoDB connection setup
+|   |-- middleware/
+|   |   |-- auth.js                 JWT authentication middleware
+|   |   |-- roleCheck.js            Role-based access control middleware
+|   |-- models/
+|   |   |-- User.js                 User schema (name, email, role, bio,
+|   |   |                           level, workHistory, avatar, OTP fields)
+|   |   |-- Case.js                 Forensic case schema
+|   |   |-- Evidence.js             Evidence file schema (hash, integrity,
+|   |   |                           filePath, category, AI summary)
+|   |   |-- CustodyLog.js           Chain of custody audit log schema
+|   |   |-- Task.js                 Task assignment schema
+|   |   |-- Finding.js              Investigation finding schema
+|   |-- routes/
+|   |   |-- auth.js                 Register, Login, OTP verify, Profile,
+|   |   |                           Avatar upload, Password change
+|   |   |-- cases.js                CRUD for forensic cases
+|   |   |-- evidence.js             Upload, Download, Verify, List evidence
+|   |   |-- custody.js              Chain of custody log retrieval
+|   |   |-- tasks.js                Task creation and assignment
+|   |   |-- findings.js             Investigation findings CRUD
+|   |   |-- ai.js                   AI summarization via Groq
+|   |   |-- reports.js              PDF report generation via PDFKit
+|   |-- utils/
+|   |   |-- hashUtils.js            SHA-256 streaming hash generation
+|   |   |-- pdfGenerator.js         PDF report builder
+|   |-- uploads/                    Evidence files and avatar images stored here
+|   |-- server.js                   Express app entry point
+|   |-- .env                        Environment variables (not committed)
+|
+|-- client/                         Frontend (React + Vite)
+|   |-- src/
+|   |   |-- pages/
+|   |   |   |-- Login.jsx           2-step login (credentials + OTP)
+|   |   |   |-- Register.jsx        2-step registration (form + OTP verify)
+|   |   |   |-- Dashboard.jsx       Overview stats and recent activity
+|   |   |   |-- Cases.jsx           Case listing and creation
+|   |   |   |-- CaseDetail.jsx      Case info, evidence upload with progress
+|   |   |   |-- EvidenceDetail.jsx  Evidence viewer, hash verify, download,
+|   |   |   |                       findings, AI summarize, custody timeline
+|   |   |   |-- Tasks.jsx           Task management
+|   |   |   |-- Admin.jsx           User management (admin only)
+|   |   |   |-- Profile.jsx         User profile, avatar, bio, work history,
+|   |   |   |                       auto-detected experience level, files
+|   |   |-- components/
+|   |   |   |-- Sidebar.jsx         Navigation sidebar with avatar display
+|   |   |-- context/
+|   |   |   |-- AuthContext.jsx     Global auth state management
+|   |   |-- services/
+|   |   |   |-- api.js              Axios API client with all endpoint calls
+|   |-- vite.config.js              Vite config with proxy for /api and /uploads
+|
+|-- login-tester/                   Standalone OTP testing utility
+|   |-- server.js                   Express server for OTP send/verify testing
+|   |-- public/index.html           Simple HTML UI for OTP testing
+
+
+================================================================================
+5. USER ROLES AND PERMISSIONS
+================================================================================
+
+  ROLE          PERMISSIONS
+  ----------    ---------------------------------------------------------------
+  admin         Full access: manage users, cases, evidence, tasks, reports
+  supervisor    View all cases, assign tasks, generate reports
+  analyst       Upload/analyze evidence, add findings, AI summarize
+  officer       View assigned cases and tasks, upload evidence
+
+
+================================================================================
+6. CORE FEATURES
+================================================================================
+
+6.1 OTP-BASED AUTHENTICATION
+  - Two-factor authentication for both registration and login
+  - OTP generated as 6-digit random number, valid for 10 minutes
+  - Sent via Gmail SMTP using Nodemailer
+  - Styled HTML email with "DIGITAL-CHAIN-OF-CUSTODY" branding
+  - OTP stored in MongoDB with expiry, cleared after single use
+
+6.2 EVIDENCE MANAGEMENT
+  - Upload forensic evidence files up to 10GB
+  - Supported categories: disk-image, log-file, document, memory-dump,
+    network-capture, mobile-data, other
+  - Acquisition tools tracked: FTK Imager, Autopsy, EnCase, Other
+  - SHA-256 hash generated on upload using streaming (memory efficient)
+  - Integrity verification compares stored hash vs current file hash
+  - Upload progress bar for large files (real-time %)
+  - Streaming download with custody log entry on each download
+
+6.3 CHAIN OF CUSTODY
+  - Every action on evidence is logged: uploaded, accessed, downloaded,
+    verified, transferred
+  - Logs include: timestamp, user, IP address, action details, hash values
+  - Immutable audit trail viewable on evidence detail page
+  - Timeline view in the UI
+
+6.4 AI INVESTIGATION SUMMARIZATION
+  - Powered by Groq API (LLaMA 3.3 70B model)
+  - Analyzes all findings for an evidence item
+  - Generates structured forensic report with:
+      * Investigation overview
+      * Key observations and patterns
+      * Analysis results and significance
+      * Conclusions
+      * Recommended next steps
+  - Summary saved to evidence record in database
+
+6.5 USER PROFILE
+  - Avatar upload (image files, max 2MB)
+  - Bio and department fields
+  - Work history with job title, organization, date range
+  - Experience level auto-detected from work history dates:
+      < 2 years  --> Junior
+      2-4 years  --> Mid
+      4-7 years  --> Senior
+      7-10 years --> Lead
+      10+ years  --> Expert
+  - Files tab showing assigned tasks and uploaded evidence
+  - Password change with current password verification
+
+6.6 TASK MANAGEMENT
+  - Admin/supervisor can assign tasks to officers/analysts
+  - Tasks linked to cases with priority and due date
+  - Status tracking: pending, in-progress, completed
+
+6.7 PDF REPORT GENERATION
+  - Full forensic case report generated as PDF
+  - Includes case details, evidence list, custody logs, findings
+  - Downloadable directly from case detail page
+
+6.8 LARGE FILE SUPPORT
+  - Multer file size limit: 10GB
+  - Server HTTP timeout: 1 hour
+  - Axios request timeout: 1 hour
+  - Hash generation uses Node.js streams (no memory bottleneck)
+  - File download uses fs.createReadStream (no memory bottleneck)
+
+
+================================================================================
+7. API ENDPOINTS SUMMARY
+================================================================================
+
+AUTH
+  POST   /api/auth/register/send-otp      Send OTP for new registration
+  POST   /api/auth/register/verify-otp    Verify OTP and create account
+  POST   /api/auth/login                  Verify credentials, send login OTP
+  POST   /api/auth/verify-otp             Verify login OTP, return JWT
+  GET    /api/auth/me                     Get current user
+  PUT    /api/auth/profile                Update profile (bio, level, history)
+  PUT    /api/auth/change-password        Change password
+  POST   /api/auth/avatar                 Upload profile picture
+  GET    /api/auth/users                  List all users (admin only)
+  PUT    /api/auth/users/:id/role         Update user role (admin only)
+  PUT    /api/auth/users/:id/toggle       Toggle user active status (admin only)
+
+CASES
+  GET    /api/cases                       List all cases
+  POST   /api/cases                       Create new case
+  GET    /api/cases/:id                   Get case detail
+  PUT    /api/cases/:id                   Update case
+  DELETE /api/cases/:id                   Delete case
+  GET    /api/cases/stats/overview        Dashboard statistics
+
+EVIDENCE
+  GET    /api/evidence/case/:caseId       Get evidence for a case
+  GET    /api/evidence/detail/:id         Get evidence detail (logs access)
+  POST   /api/evidence/upload/:caseId     Upload evidence file
+  GET    /api/evidence/download/:id       Download evidence file (logs download)
+  POST   /api/evidence/verify/:id         Verify SHA-256 integrity
+  GET    /api/evidence/all                Get all evidence
+
+CUSTODY
+  GET    /api/custody/:evidenceId         Get custody log for evidence
+  GET    /api/custody                     Get all custody logs
+
+TASKS
+  GET    /api/tasks                       List tasks
+  POST   /api/tasks                       Create task
+  PUT    /api/tasks/:id/respond           Respond to task
+  PUT    /api/tasks/:id/status            Update task status
+
+FINDINGS
+  GET    /api/findings/:evidenceId        Get findings for evidence
+  POST   /api/findings/:evidenceId        Add finding
+  DELETE /api/findings/:id               Delete finding
+
+AI
+  POST   /api/ai/summarize/:evidenceId    Generate AI summary via Groq
+
+REPORTS
+  GET    /api/reports/:caseId             Generate and download PDF report
+
+
+================================================================================
+8. ENVIRONMENT VARIABLES (.env)
+================================================================================
+
+  PORT=5000
+  MONGODB_URI=mongodb://localhost:27017/evidence_management
+  JWT_SECRET=<secret_key>
+  JWT_EXPIRE=7d
+  EMAIL_USER=uday92689@gmail.com
+  EMAIL_PASS=<gmail_app_password>
+  GROQ_API_KEY=<groq_api_key>
+
+
+================================================================================
+9. SETUP AND RUNNING
+================================================================================
+
+PREREQUISITES
+  - Node.js v18+
+  - MongoDB running locally or MongoDB Atlas URI
+  - Gmail account with App Password enabled
+
+INSTALL DEPENDENCIES
+  cd server && npm install
+  cd client && npm install
+
+START BACKEND
+  cd server
+  node server.js
+  --> Runs on http://localhost:5000
+
+START FRONTEND
+  cd client
+  npm run dev
+  --> Runs on http://localhost:3000
+
+OTP TESTER (standalone)
+  cd login-tester
+  node server.js
+  --> Runs on http://localhost:4000
+
+
+================================================================================
+10. SECURITY FEATURES
+================================================================================
+
+  - Passwords hashed with bcrypt (12 salt rounds)
+  - JWT tokens expire in 7 days
+  - OTP expires in 10 minutes, single use only
+  - Role-based middleware on all protected routes
+  - File integrity verified with SHA-256 on every access
+  - All evidence actions logged with IP address and timestamp
+  - Avatar uploads restricted to image files, max 2MB
+  - CORS enabled for cross-origin requests
+
+
+================================================================================
+11. KNOWN LIMITATIONS
+================================================================================
+
+  - MongoDB must be running locally or Atlas URI must be configured
+  - Gmail App Password required for OTP emails
+  - Groq free tier: 14,400 requests/day limit
+  - File storage is local disk (not cloud storage)
+  - No real-time notifications (polling based)
+
+
+================================================================================
+                    END OF OVERVIEW DOCUMENT
+         Digital Chain of Custody - Forensic Evidence Management System
+================================================================================

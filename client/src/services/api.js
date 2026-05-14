@@ -1,7 +1,8 @@
 import axios from 'axios';
 
 const API = axios.create({
-    baseURL: '/api'
+    baseURL: '/api',
+    timeout: 3600000 // 1 hour default for large file operations
 });
 
 // Attach JWT token to every request
@@ -33,7 +34,11 @@ export const registerVerifyOtp = (data) => API.post('/auth/register/verify-otp',
 export const login = (data) => API.post('/auth/login', data);
 export const verifyOtp = (data) => API.post('/auth/verify-otp', data);
 export const getMe = () => API.get('/auth/me');
+export const updateProfile = (data) => API.put('/auth/profile', data);
+export const changePassword = (data) => API.put('/auth/change-password', data);
+export const uploadAvatar = (formData) => API.post('/auth/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 export const getUsers = () => API.get('/auth/users');
+export const getUserById = (id) => API.get(`/auth/users/${id}`);
 export const updateUserRole = (id, role) => API.put(`/auth/users/${id}/role`, { role });
 export const toggleUser = (id) => API.put(`/auth/users/${id}/toggle`);
 
@@ -48,8 +53,15 @@ export const getCaseStats = () => API.get('/cases/stats/overview');
 // Evidence
 export const getEvidenceByCase = (caseId) => API.get(`/evidence/case/${caseId}`);
 export const getEvidenceDetail = (id) => API.get(`/evidence/detail/${id}`);
-export const uploadEvidence = (caseId, formData) => API.post(`/evidence/upload/${caseId}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+export const downloadEvidence = (id) => API.get(`/evidence/download/${id}`, { responseType: 'blob' });
+export const uploadEvidence = (caseId, formData, onProgress) => API.post(`/evidence/upload/${caseId}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 3600000, // 1 hour for large files
+    onUploadProgress: (e) => {
+        if (onProgress && e.total) {
+            onProgress(Math.round((e.loaded * 100) / e.total));
+        }
+    }
 });
 export const verifyEvidence = (id) => API.post(`/evidence/verify/${id}`);
 export const getAllEvidence = () => API.get('/evidence/all');
